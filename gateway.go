@@ -33,9 +33,11 @@ func throw(err error) {
 
 func getEnvs() error {
 	PQCSpath := os.Getenv("pqconnectionstringpath")
-	PQName := os.Getenv("PLogQName")
+	PQName := os.Getenv("plogqname")
+	PQServerAddress := os.Getenv("plogqserveraddress")
 	SQCSpath := os.Getenv("sqconnectionstringpath")
-	SQName := os.Getenv("SLogQName")
+	SQName := os.Getenv("slogqname")
+	SQServerAddress := os.Getenv("slogqserveraddress")
 	if PQCSpath == "" {
 		return fmt.Errorf("cannot get environment variable pqconnectionstringpath")
 	}
@@ -56,8 +58,10 @@ func getEnvs() error {
 	if err != nil {
 		return err
 	}
-	PQConnectionString := strings.Split(string(pqcsbytes), "\n")[0]
-	SQConnectionString := strings.Split(string(sqcsbytes), "\n")[0]
+	plogqpass := strings.Split(string(pqcsbytes), "\n")[0]
+	slogqpass := strings.Split(string(sqcsbytes), "\n")[0]
+	PQConnectionString := fmt.Sprintf("amqp://%s@%s", plogqpass, PQServerAddress)
+	SQConnectionString := fmt.Sprintf("amqp://%s@%s", slogqpass, SQServerAddress)
 	qconf1 := qconfig{QName: PQName, QConnectionString: PQConnectionString}
 	qconf2 := qconfig{QName: SQName, QConnectionString: SQConnectionString}
 	GlobalConfig.QConfig = []qconfig{qconf1, qconf2}

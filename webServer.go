@@ -25,10 +25,8 @@ func Validate(log bson.M) error {
 	return nil
 }
 
-func AddMessage(log bson.M) error {
-	myBreaker := Breaker{}
-	myBreaker.New(SendMessage)
-	err := myBreaker.Do(GlobalConfig.QConfig[0].QConnectionString, GlobalConfig.QConfig[0].QName, log)
+func AddMessage(log bson.M, breaker *Breaker) error {
+	err := breaker.Do(GlobalConfig.QConfig[0].QConnectionString, GlobalConfig.QConfig[0].QName, log)
 	if err != nil {
 		err := SendMessage(GlobalConfig.QConfig[1].QConnectionString, GlobalConfig.QConfig[1].QName, log)
 		if err != nil {
@@ -53,7 +51,9 @@ func AddLog(c *gin.Context) {
 		c.IndentedJSON(400, httpresponse{Status: false, Message: message})
 		return
 	}
-	err = AddMessage(log)
+	myBreaker := Breaker{}
+	myBreaker.New(SendMessage)
+	err = AddMessage(log, &myBreaker)
 	if err != nil {
 		message = fmt.Sprintf("Error: %s", err)
 		c.IndentedJSON(400, httpresponse{Status: false, Message: message})
