@@ -37,7 +37,7 @@ func AddMessage(log bson.M, breaker *Breaker) error {
 }
 
 func AddLog(c *gin.Context) {
-	message := "TestResponse"
+	message := "Success"
 	log := bson.M{}
 	err := c.BindJSON(&log)
 	if err != nil {
