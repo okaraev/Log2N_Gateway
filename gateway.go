@@ -9,6 +9,7 @@ import (
 )
 
 var GlobalConfig webconfig
+var myBreaker Breaker
 
 type Log struct {
 	Team     string
@@ -71,6 +72,7 @@ func getEnvs() error {
 func main() {
 	err := getEnvs()
 	throw(err)
+	myBreaker.New(SendMessage)
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.POST("/api/1/Log", AddLog)
