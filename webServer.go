@@ -51,8 +51,6 @@ func AddLog(c *gin.Context) {
 		c.IndentedJSON(400, httpresponse{Status: false, Message: message})
 		return
 	}
-	myBreaker := Breaker{}
-	myBreaker.New(SendMessage)
 	err = AddMessage(log, &myBreaker)
 	if err != nil {
 		message = fmt.Sprintf("Error: %s", err)
