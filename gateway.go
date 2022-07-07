@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -33,39 +34,29 @@ func throw(err error) {
 }
 
 func getEnvs() error {
-	PQCSpath := os.Getenv("pqconnectionstringpath")
-	PQName := os.Getenv("plogqname")
-	PQServerAddress := os.Getenv("plogqserveraddress")
-	SQCSpath := os.Getenv("sqconnectionstringpath")
-	SQName := os.Getenv("slogqname")
-	SQServerAddress := os.Getenv("slogqserveraddress")
-	if PQCSpath == "" {
-		return fmt.Errorf("cannot get environment variable pqconnectionstringpath")
+	myQConfig := []qconfig{}
+	for _, each := range []string{"p", "s"} {
+		for _, item := range []string{"logqname", "logqserveraddress", "qconnectionstringpath"} {
+			envVar := fmt.Sprintf("%s%s", each, item)
+			log.Printf("Getting value of: %s\n", envVar)
+			varValue := os.Getenv(envVar)
+			if varValue == "" {
+				return fmt.Errorf("cannot get environment variable %s", envVar)
+			}
+		}
+		QCSpath := os.Getenv(fmt.Sprintf("%sqconnectionstringpath", each))
+		QName := os.Getenv(fmt.Sprintf("%slogqname", each))
+		QServerAddress := os.Getenv(fmt.Sprintf("%slogqserveraddress", each))
+		qcsbytes, err := os.ReadFile(QCSpath)
+		if err != nil {
+			return err
+		}
+		logqpass := strings.Split(string(qcsbytes), "\n")[0]
+		QConnectionString := fmt.Sprintf("amqp://%s@%s", logqpass, QServerAddress)
+		qconf := qconfig{QName: QName, QConnectionString: QConnectionString}
+		myQConfig = append(myQConfig, qconf)
 	}
-	if PQName == "" {
-		return fmt.Errorf("cannot get environment variable plogqname")
-	}
-	if SQCSpath == "" {
-		return fmt.Errorf("cannot get environment variable sqconnectionstringpath")
-	}
-	if SQName == "" {
-		return fmt.Errorf("cannot get environment variable slogqname")
-	}
-	pqcsbytes, err := os.ReadFile(PQCSpath)
-	if err != nil {
-		return err
-	}
-	sqcsbytes, err := os.ReadFile(SQCSpath)
-	if err != nil {
-		return err
-	}
-	plogqpass := strings.Split(string(pqcsbytes), "\n")[0]
-	slogqpass := strings.Split(string(sqcsbytes), "\n")[0]
-	PQConnectionString := fmt.Sprintf("amqp://%s@%s", plogqpass, PQServerAddress)
-	SQConnectionString := fmt.Sprintf("amqp://%s@%s", slogqpass, SQServerAddress)
-	qconf1 := qconfig{QName: PQName, QConnectionString: PQConnectionString}
-	qconf2 := qconfig{QName: SQName, QConnectionString: SQConnectionString}
-	GlobalConfig.QConfig = []qconfig{qconf1, qconf2}
+	GlobalConfig.QConfig = myQConfig
 	return nil
 }
 
