@@ -10,7 +10,10 @@ import (
 )
 
 var GlobalConfig webconfig
-var myBreaker Breaker
+var Brkr Breaker
+var FM FileManager
+var QConnectionString string
+var QName string
 
 type Log struct {
 	Team     string
@@ -69,7 +72,8 @@ func getEnvs() error {
 func main() {
 	err := getEnvs()
 	throw(err)
-	myBreaker.New(SendMessage)
+	FM = GetFMDefaultInstance()
+	Brkr = GetBreakerInstance(FM.MessageAdd)
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.POST("/api/1/Log", AddLog)
