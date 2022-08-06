@@ -15,11 +15,20 @@ type Breaker struct {
 	FailThreshold    int           // Failed operations threshold
 	SuccessThreshold time.Duration // Time duration in which all operations must be succeeded after that FailCount will reset and Status will change to 'Closed'
 	OpenThreshold    time.Duration // Time duration after which Status will change to 'HalfOpen'
-	Operation        func(q, qq string, i interface{}) error
+	Operation        func(i interface{}) error
 }
 
-func SendMessage(amqpServerURL string, QName string, i interface{}) error {
-	connectRabbitMQ, err := amqp.Dial(amqpServerURL)
+type FileManager struct {
+	AddMessageFunction func(message interface{}) error
+}
+
+func (f FileManager) MessageAdd(message interface{}) error {
+	result := f.AddMessageFunction(message)
+	return result
+}
+
+func MessageSend(message interface{}) error {
+	connectRabbitMQ, err := amqp.Dial(QConnectionString)
 	if err != nil {
 		return err
 	}
@@ -29,40 +38,53 @@ func SendMessage(amqpServerURL string, QName string, i interface{}) error {
 		return err
 	}
 	defer channelRabbitMQ.Close()
-	bytes, err := json.Marshal(i)
+	bytes, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
-	message := amqp.Publishing{
+	Message := amqp.Publishing{
 		ContentType: "application/json",
 		Body:        bytes,
 	}
-	err = channelRabbitMQ.Publish("", QName, false, false, message)
+	err = channelRabbitMQ.Publish("", QName, false, false, Message)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b *Breaker) New(myFunc func(q, qq string, i interface{}) error) {
-	b.Status = "Closed"
-	b.OpenThreshold = 30 * time.Second
-	b.FailCount = 0
-	b.FailThreshold = 3
-	b.LastFail = time.Now()
-	b.SuccessThreshold = 1 * time.Minute
-	b.Operation = myFunc
+func GetFMDefaultInstance() FileManager {
+	FM := FileManager{AddMessageFunction: MessageSend}
+	return FM
+}
+
+func GetFMOverLoadInstace(function func(message interface{}) error) FileManager {
+	fm := FileManager{AddMessageFunction: function}
+	return fm
+}
+
+func GetBreakerInstance(function func(iv interface{}) error) Breaker {
+	br := Breaker{
+		Status:           "Closed",
+		OpenThreshold:    30 * time.Second,
+		FailCount:        0,
+		FailThreshold:    3,
+		LastFail:         time.Now(),
+		SuccessThreshold: 1 * time.Minute,
+		Operation:        function,
+	}
+	return br
 }
 
 func (b *Breaker) Open() {
+	b.Status = "Open"
 	go func() {
-		b.Status = "Open"
 		time.Sleep(b.OpenThreshold)
 		b.Status = "HalfOpen"
 	}()
 }
 
-func (b *Breaker) Do(AMQPServer string, QName string, i interface{}) error {
+func (b *Breaker) Do(iv interface{}) error {
 	// IF Connection is OK and Fail threshold is exceeded mark connection as fail for a time for a fast fail
 	if b.Status == "Closed" && b.FailCount >= b.FailThreshold {
 		b.Open()
@@ -73,7 +95,7 @@ func (b *Breaker) Do(AMQPServer string, QName string, i interface{}) error {
 		return errors.New("fail treshold exceeded")
 	}
 	// DO operation and check result
-	err := b.Operation(AMQPServer, QName, i)
+	err := b.Operation(iv)
 	if err != nil {
 		if b.Status == "HalfOpen" {
 			b.Open()
