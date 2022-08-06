@@ -24,7 +24,8 @@ type qconfig struct {
 }
 
 type webconfig struct {
-	QConfig []qconfig
+	QConfig   []qconfig
+	HTTP_PORT string
 }
 
 func throw(err error) {
@@ -56,6 +57,11 @@ func getEnvs() error {
 		qconf := qconfig{QName: QName, QConnectionString: QConnectionString}
 		myQConfig = append(myQConfig, qconf)
 	}
+	port := os.Getenv("HTTP_PORT")
+	if port == "" {
+		return fmt.Errorf("cannot find http_port environment variable")
+	}
+	GlobalConfig.HTTP_PORT = port
 	GlobalConfig.QConfig = myQConfig
 	return nil
 }
@@ -67,9 +73,5 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.POST("/api/1/Log", AddLog)
-	port := os.Getenv("HTTP_PORT")
-	if port == "" {
-		throw(fmt.Errorf("cannot find http_port environment variable"))
-	}
-	router.Run(":" + port)
+	router.Run(":" + GlobalConfig.HTTP_PORT)
 }
